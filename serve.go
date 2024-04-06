@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"strconv"
 	"time"
 
 	"github.com/ignite/cli/ignite/pkg/cosmosclient"
@@ -29,21 +29,75 @@ func GetTransfers() []Tranfer {
 		panic(err.Error())
 	}
 
+	fmt.Println(transfers)
+
 	return transfers
 }
 
-func ProcessTransfers(client *cosmosclient.client, addr string, transfers []Tranfer) {
+func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
 	ctx := context.Background()
 
-	queryClient := types.NewQueryClient(client.Context())
-
-	queryResp, err := queryClient.GetLastProcessed(ctx, &types.QueryGetLastProcessedRequest{})
+	account, err := client.Account("bob")
 	if err != nil {
-		log.Fatal(err)
+		panic(err.Error())
 	}
 
-	fmt.Println(transfers)
-	fmt.Println(queryResp)
+	addr, err := account.Address("cosmos")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	queryClient := types.NewQueryClient(client.Context())
+	getLastProcessedResp, err := queryClient.GetLastProcessed(ctx, &types.QueryGetLastProcessedRequest{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println(getLastProcessedResp)
+
+	processed, err := strconv.ParseUint(getLastProcessedResp.TransactionId, 10, 64)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for processed++; processed < uint64(len(transfers)); processed++ {
+		amount, err := strconv.ParseUint(transfers[processed].Amount, 10, 64)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		getAmountResp, err := queryClient.GetAmount(ctx, &types.QueryGetAmountRequest{SenderAddress: transfers[processed].From})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		if getAmountResp.Amount == amount {
+			msg := &types.MsgApproveRequest{
+				Creator:       addr,
+				SenderAddress: transfers[processed].From,
+				TransactionId: string(processed),
+			}
+
+			txResp, err := client.BroadcastTx(ctx, account, msg)
+			if err != nil {
+				panic(err.Error())
+			}
+
+			fmt.Println(txResp)
+		} else {
+			msg := &types.MsgProcessTransaction{
+				Creator:       addr,
+				TransactionId: string(processed),
+			}
+
+			txResp, err := client.BroadcastTx(ctx, account, msg)
+			if err != nil {
+				panic(err.Error())
+			}
+
+			fmt.Println(txResp)
+		}
+	}
 }
 
 func Serve() {
@@ -55,26 +109,16 @@ func Serve() {
 
 	client, err := cosmosclient.New(ctx, cosmosclient.WithAddressPrefix(addressPrefix))
 	if err != nil {
-		log.Fatal(err)
+		panic(err.Error())
 	}
 
-	account, err := client.Account("bob")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	addr, err := account.Address(addressPrefix)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ProcessTransfers(client, addr, GetTransfers())
+	ProcessTransfers(client, GetTransfers())
 
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				ProcessTransfers(client, addr, GetTransfers())
+				ProcessTransfers(client, GetTransfers())
 			}
 		}
 	}()
