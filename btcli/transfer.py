@@ -2,7 +2,7 @@ import bittensor as bt
 import click
 import json
 
-from .common import *
+from common import *
 
 
 @click.command()

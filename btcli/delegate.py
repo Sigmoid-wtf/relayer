@@ -1,7 +1,7 @@
 import bittensor as bt
 import click
 
-from .common import *
+from common import *
 
 
 @click.command()

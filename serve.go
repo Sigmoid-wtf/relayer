@@ -1,4 +1,4 @@
-package relayer
+package main
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ignite/cli/ignite/pkg/cosmosclient"
+	"github.com/ignite/cli/v28/ignite/pkg/cosmosclient"
 
 	"chain/x/sigmoidtest/types"
 )
@@ -112,13 +112,13 @@ func Serve() {
 		panic(err.Error())
 	}
 
-	ProcessTransfers(client, GetTransfers())
+	ProcessTransfers(&client, GetTransfers())
 
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				ProcessTransfers(client, GetTransfers())
+				ProcessTransfers(&client, GetTransfers())
 			}
 		}
 	}()

@@ -1,6 +1,8 @@
-package relayer
+package main
 
-import "os/exec"
+import (
+	"os/exec"
+)
 
 func RunBittensorCliCommand(args []string) []byte {
 	cmd := exec.Command("btcli", args...)

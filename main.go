@@ -1,4 +1,4 @@
-package relayer
+package main
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func main() {
 			fmt.Println(RunPython3Command([]string{
 				"btcli/delegate.py", "delegate",
 				"--ss58-address", ss58_address,
-				"--amount", string(amount),
+				"--amount", amount,
 			}))
 		},
 	}
@@ -37,7 +37,7 @@ func main() {
 			fmt.Println(RunPython3Command([]string{
 				"btcli/delegate.py", "undelegate",
 				"--ss58-address", ss58_address,
-				"--amount", string(amount),
+				"--amount", amount,
 			}))
 		},
 	}
