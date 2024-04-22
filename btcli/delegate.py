@@ -9,11 +9,11 @@ from common import *
 def delegate(ss58_address, amount):
     wallet = bt.wallet(name=WALLET_NAME)
     subtensor = bt.subtensor()
-    subtensor.delegate(
+    print(subtensor.delegate(
         wallet=wallet,
         delegate_ss58=ss58_address,
         amount=amount,
-    )
+    ))
 
 
 @click.command()
@@ -21,11 +21,11 @@ def delegate(ss58_address, amount):
 def undelegate(ss58_address, amount):
     wallet = bt.wallet(name=WALLET_NAME)
     subtensor = bt.subtensor()
-    subtensor.undelegate(
+    print(subtensor.undelegate(
         wallet=wallet,
         delegate_ss58=ss58_address,
         amount=amount,
-    )
+    ))
 
 
 cli.add_command(delegate)

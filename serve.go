@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/ignite/cli/v28/ignite/pkg/cosmosclient"
 
-	"chain/x/sigmoidtest/types"
+	"chain/x/sigmoid/types"
 )
 
 type Tranfer struct {
@@ -28,8 +29,9 @@ func GetTransfers() []Tranfer {
 	if err != nil {
 		panic(err.Error())
 	}
+	slices.Reverse(transfers)
 
-	fmt.Println(transfers)
+	fmt.Println("Transfer transactions count: ", len(transfers))
 
 	return transfers
 }
@@ -37,7 +39,7 @@ func GetTransfers() []Tranfer {
 func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
 	ctx := context.Background()
 
-	account, err := client.Account("bob")
+	account, err := client.Account("alice")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -55,49 +57,118 @@ func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
 
 	fmt.Println(getLastProcessedResp)
 
-	processed, err := strconv.ParseUint(getLastProcessedResp.TransactionId, 10, 64)
+	processed, err := strconv.ParseInt(getLastProcessedResp.TransactionId, 10, 64)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	for processed++; processed < uint64(len(transfers)); processed++ {
+	for processed++; processed < int64(len(transfers)); processed++ {
+		processTransaction := func() {
+			msg := &types.MsgProcessTransaction{
+				Creator:       addr,
+				TransactionId: strconv.FormatInt(int64(processed), 10),
+			}
+
+			txResp, err := client.BroadcastTx(ctx, account, msg)
+			if err != nil {
+				panic(err.Error())
+			}
+
+			fmt.Println(txResp)
+		}
+
 		amount, err := strconv.ParseUint(transfers[processed].Amount, 10, 64)
 		if err != nil {
 			panic(err.Error())
 		}
+		fmt.Println("Amount from bittensor tx", amount)
 
 		getAmountResp, err := queryClient.GetAmount(ctx, &types.QueryGetAmountRequest{SenderAddress: transfers[processed].From})
 		if err != nil {
-			panic(err.Error())
+			fmt.Println(err.Error())
+			processTransaction()
+			continue
 		}
+		fmt.Println("Amount from sigmoid tx", amount)
 
 		if getAmountResp.Amount == amount {
+			taoAmount := strconv.FormatFloat(float64(amount)/1000000000, 'f', -1, 64)
+			fmt.Println("Delegate ", taoAmount, " TAO")
+			delegate := RunPython3Command([]string{
+				"btcli/delegate.py", "delegate",
+				"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
+				"--amount", taoAmount,
+			})
+			fmt.Println(string(delegate))
+
 			msg := &types.MsgApproveRequest{
 				Creator:       addr,
 				SenderAddress: transfers[processed].From,
-				TransactionId: string(processed),
+				TransactionId: strconv.FormatInt(int64(processed), 10),
 			}
 
 			txResp, err := client.BroadcastTx(ctx, account, msg)
 			if err != nil {
 				panic(err.Error())
 			}
-
 			fmt.Println(txResp)
 		} else {
-			msg := &types.MsgProcessTransaction{
-				Creator:       addr,
-				TransactionId: string(processed),
-			}
-
-			txResp, err := client.BroadcastTx(ctx, account, msg)
-			if err != nil {
-				panic(err.Error())
-			}
-
-			fmt.Println(txResp)
+			processTransaction()
 		}
 	}
+}
+
+func ProcessUnstakeRequest(client *cosmosclient.Client) {
+	ctx := context.Background()
+
+	account, err := client.Account("bob")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	addr, err := account.Address("cosmos")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	queryClient := types.NewQueryClient(client.Context())
+	getPendingUnstakeResponse, err := queryClient.GetPendingUnstakeRequest(ctx, &types.QueryGetPendingUnstakeRequestRequest{})
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println(getPendingUnstakeResponse)
+
+	if *getPendingUnstakeResponse.Request == (types.MsgCreateUnstakeRequest{}) {
+		fmt.Println("No requests to unstake")
+		return
+	}
+
+	taoAmount := strconv.FormatFloat(float64(getPendingUnstakeResponse.Request.Amount)/1000000000, 'f', -1, 64)
+	fmt.Println("Undelegate ", taoAmount, " TAO")
+	delegate := RunPython3Command([]string{
+		"btcli/delegate.py", "undelegate",
+		"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
+		"--amount", taoAmount,
+	})
+	fmt.Println(string(delegate))
+
+	transfer := RunPython3Command([]string{
+		"btcli/transfer.py", "transfer",
+		"--ss58-address", getPendingUnstakeResponse.Request.UnstakeAddress,
+		"--amount", taoAmount,
+	})
+	fmt.Println(string(transfer))
+
+	msg := &types.MsgApproveUnstakeRequest{
+		Creator:        addr,
+		UnstakeAddress: getPendingUnstakeResponse.Request.UnstakeAddress,
+	}
+
+	txResp, err := client.BroadcastTx(ctx, account, msg)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println(txResp)
 }
 
 func Serve() {
@@ -113,13 +184,13 @@ func Serve() {
 	}
 
 	ProcessTransfers(&client, GetTransfers())
+	ProcessUnstakeRequest(&client)
 
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				ProcessTransfers(&client, GetTransfers())
-			}
+	for {
+		select {
+		case <-ticker.C:
+			ProcessTransfers(&client, GetTransfers())
+			ProcessUnstakeRequest(&client)
 		}
-	}()
+	}
 }
