@@ -70,11 +70,22 @@ def my_delegates():
     print(json.dumps(delegates, indent=4))
 
 
+@click.command()
+def balance():
+    wallet = bt.wallet(name=WALLET_NAME)
+    subtensor = bt.subtensor(log_verbose=False)
+    print(json.dumps({
+        'free': str(subtensor.get_balance(wallet.coldkeypub.ss58_address).tao),
+        'staked': str(subtensor.get_total_stake_for_coldkey(wallet.coldkeypub.ss58_address).tao),
+    }))
+
+
 cli.add_command(init_wallet)
 cli.add_command(delegate)
 cli.add_command(undelegate)
 cli.add_command(transfer_list)
 cli.add_command(my_delegates)
+cli.add_command(balance)
 
 
 if __name__ == '__main__':

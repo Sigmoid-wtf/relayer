@@ -13,6 +13,11 @@ import (
 	"chain/x/sigmoid/types"
 )
 
+type Balance struct {
+	Free   uint64 `json:"free"`
+	Staked uint64 `json:"staked"`
+}
+
 type Tranfer struct {
 	Id          string `json:"id"`
 	From        string `json:"from"`
@@ -20,6 +25,19 @@ type Tranfer struct {
 	Amount      string `json:"amount"`
 	ExtrinsicId uint   `json:"extrinsicId"`
 	BlockNumber string `json:"blockNumber"`
+}
+
+func GetBalance() Balance {
+	var balance Balance
+
+	err := json.Unmarshal(RunPython3Command([]string{"btcli/balance.py", "balance"}), &balance)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println("Get balance: ", balance)
+
+	return balance
 }
 
 func GetTransfers() []Tranfer {
@@ -34,6 +52,31 @@ func GetTransfers() []Tranfer {
 	fmt.Println("Transfer transactions count: ", len(transfers))
 
 	return transfers
+}
+
+func ProcessBalance(client *cosmosclient.Client, balance Balance) {
+	ctx := context.Background()
+
+	account, err := client.Account("bob")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	addr, err := account.Address("cosmos")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	msg := &types.MsgSetRaoCurrentStakedBalance{
+		Creator:                 addr,
+		RaoCurrentStakedBalance: balance.Staked,
+	}
+
+	txResp, err := client.BroadcastTx(ctx, account, msg)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println(txResp)
 }
 
 func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
@@ -185,12 +228,14 @@ func Serve() {
 
 	ProcessTransfers(&client, GetTransfers())
 	ProcessUnstakeRequest(&client)
+	ProcessBalance(&client, GetBalance())
 
 	for {
 		select {
 		case <-ticker.C:
 			ProcessTransfers(&client, GetTransfers())
 			ProcessUnstakeRequest(&client)
+			ProcessBalance(&client, GetBalance())
 		}
 	}
 }
