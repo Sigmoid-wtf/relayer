@@ -16,7 +16,7 @@ def delegate_options():
     def decorator_wrapper(func):
 
         @click.option('--ss58-address', type=str, required=True, help='ss58_address')
-        @click.option('--amount', type=float, required=True, help='TAO amount to delegate')
+        @click.option('--amount', type=int, required=True, help='RAO amount to delegate')
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)

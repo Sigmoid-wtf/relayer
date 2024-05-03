@@ -13,7 +13,7 @@ def transfer(ss58_address, amount):
     print(subtensor.transfer(
         wallet=wallet,
         dest=ss58_address,
-        amount=amount,
+        amount=bt.Balance(amount),
         wait_for_inclusion=True,
         prompt=False,
     ))

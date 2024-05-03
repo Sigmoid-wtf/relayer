@@ -135,12 +135,11 @@ func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
 		fmt.Println("Amount from sigmoid tx", amount)
 
 		if getAmountResp.Amount == amount {
-			taoAmount := strconv.FormatFloat(float64(amount)/1000000000, 'f', -1, 64)
-			fmt.Println("Delegate ", taoAmount, " TAO")
+			fmt.Println("Delegate ", amount, " RAO")
 			delegate := RunPython3Command([]string{
 				"btcli/delegate.py", "delegate",
 				"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
-				"--amount", taoAmount,
+				"--amount", string(amount),
 			})
 			fmt.Println(string(delegate))
 
@@ -186,19 +185,24 @@ func ProcessUnstakeRequest(client *cosmosclient.Client) {
 		return
 	}
 
-	taoAmount := strconv.FormatFloat(float64(getPendingUnstakeResponse.Request.Amount)/1000000000, 'f', -1, 64)
-	fmt.Println("Undelegate ", taoAmount, " TAO")
+	getSigtaoRateDResponse, err := queryClient.GetSigtaoRateD(ctx, &types.QueryGetSigtaoRateDRequest{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	undelegateRao := getPendingUnstakeResponse.Request.Amount * getSigtaoRateDResponse.SigtaoRateD / 1000000000
+	fmt.Println("Undelegate ", undelegateRao, " RAO")
 	delegate := RunPython3Command([]string{
 		"btcli/delegate.py", "undelegate",
 		"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
-		"--amount", taoAmount,
+		"--amount", string(undelegateRao),
 	})
 	fmt.Println(string(delegate))
 
 	transfer := RunPython3Command([]string{
 		"btcli/transfer.py", "transfer",
 		"--ss58-address", getPendingUnstakeResponse.Request.UnstakeAddress,
-		"--amount", taoAmount,
+		"--amount", string(undelegateRao),
 	})
 	fmt.Println(string(transfer))
 
