@@ -24,7 +24,7 @@ def undelegate(ss58_address, amount):
     print(subtensor.undelegate(
         wallet=wallet,
         delegate_ss58=ss58_address,
-        amount=bt.Balance(amount),,
+        amount=bt.Balance(amount),
     ))
 
 

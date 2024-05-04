@@ -139,7 +139,7 @@ func ProcessTransfers(client *cosmosclient.Client, transfers []Tranfer) {
 			delegate := RunPython3Command([]string{
 				"btcli/delegate.py", "delegate",
 				"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
-				"--amount", string(amount),
+				"--amount", strconv.FormatUint(amount, 10),
 			})
 			fmt.Println(string(delegate))
 
@@ -195,14 +195,14 @@ func ProcessUnstakeRequest(client *cosmosclient.Client) {
 	delegate := RunPython3Command([]string{
 		"btcli/delegate.py", "undelegate",
 		"--ss58-address", "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3",
-		"--amount", string(undelegateRao),
+		"--amount", strconv.FormatUint(undelegateRao, 10),
 	})
 	fmt.Println(string(delegate))
 
 	transfer := RunPython3Command([]string{
 		"btcli/transfer.py", "transfer",
 		"--ss58-address", getPendingUnstakeResponse.Request.UnstakeAddress,
-		"--amount", string(undelegateRao),
+		"--amount", strconv.FormatUint(undelegateRao, 10),
 	})
 	fmt.Println(string(transfer))
 
