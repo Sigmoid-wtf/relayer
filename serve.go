@@ -218,6 +218,51 @@ func ProcessUnstakeRequest(client *cosmosclient.Client) {
 	fmt.Println(txResp)
 }
 
+func ProcessBridgeRequest(client *cosmosclient.Client) {
+	ctx := context.Background()
+
+	account, err := client.Account("bob")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	addr, err := account.Address("cosmos")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	queryClient := types.NewQueryClient(client.Context())
+	getPendingBridgeResponse, err := queryClient.GetPendingBridgeRequest(ctx, &types.QueryGetPendingBridgeRequestRequest{})
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println(getPendingBridgeResponse)
+
+	if *getPendingBridgeResponse.Request == (types.MsgCreateBridgeRequest{}) {
+		fmt.Println("No requests to bridge")
+		return
+	}
+
+	fmt.Println("Bridge from ", getPendingBridgeResponse.Request.Creator, " to ", getPendingBridgeResponse.Request.Erc20Address, " ", getPendingBridgeResponse.Request.Amount, " RAO")
+	delegate := RunPython3Command([]string{
+		"btcli/bridge.py", "bridge",
+		"--address", getPendingBridgeResponse.Request.Erc20Address,
+		"--amount", strconv.FormatUint(getPendingBridgeResponse.Request.Amount, 10),
+	})
+	fmt.Println(string(delegate))
+
+	msg := &types.MsgApproveBridgeRequest{
+		Creator: addr,
+		Address: getPendingBridgeResponse.Request.Creator,
+	}
+
+	txResp, err := client.BroadcastTx(ctx, account, msg)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println(txResp)
+}
+
 func Serve() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -233,11 +278,13 @@ func Serve() {
 	ProcessTransfers(&client, GetTransfers())
 	ProcessUnstakeRequest(&client)
 	ProcessBalance(&client, GetBalance())
+	ProcessBridgeRequest(&client)
 
 	for {
 		select {
 		case <-ticker.C:
 			ProcessTransfers(&client, GetTransfers())
+			ProcessBridgeRequest(&client)
 			ProcessUnstakeRequest(&client)
 			ProcessBalance(&client, GetBalance())
 		}
